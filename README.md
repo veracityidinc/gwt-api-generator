@@ -13,7 +13,7 @@ by 20 Apr 2017, thus Vaadin no longer provides support or does active developmen
 
 - Installation
 ```shell
-$ npm install -g vaadin/gwt-api-generator
+$ npm install -g veracityidinc/gwt-api-generator
 ```
 > If you've installed node and npm using `sudo`, installing packages globally will also require you to use `sudo`. See [http://givan.se/do-not-sudo-npm/](http://givan.se/do-not-sudo-npm/) how to remedy the situation.
 
@@ -75,7 +75,7 @@ Whether you need a 3 party element not included in the prebuilt packages or you 
           "version": "1.0",
           "license": "my-prefered-license",
           "dependencies": {
-            "gwt-api-generator": "vaadin/gwt-api-generator"
+            "gwt-api-generator": "veracityidinc/gwt-api-generator"
           }
         }
 
