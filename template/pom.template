@@ -118,6 +118,11 @@
                 </goals>
                 <configuration>
                     <doclint>none</doclint>
+                    <additionalJOptions>
+                        <additionalJOption>
+                            --allow-script-in-comments
+                        </additionalJOption>
+                    </additionalJOptions>
                 </configuration>
             </execution>
         </executions>
