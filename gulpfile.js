@@ -14,6 +14,10 @@ var jsonfile = require('jsonfile');
 var StreamFromArray = require('stream-from-array');
 var rename = require("gulp-rename");
 var marked = require('marked');
+var gulpif = require('gulp-if');
+var HtmlSplitter = require('polymer-build').HtmlSplitter;
+var sourcesHtmlSplitter = new HtmlSplitter();
+var babel = require('gulp-babel');
 
 var libDir = __dirname + '/lib/';
 var tplDir = __dirname + '/template/';
@@ -27,119 +31,170 @@ require('require-dir')(tplDir + 'tasks');
 global.parsed = []; // we store all parsed objects so as we can iterate or find behaviors
 
 gulp.task('clean:target', function() {
-  fs.removeSync(globalVar.clientDir + 'element');
-  fs.removeSync(globalVar.clientDir + 'widget');
+    fs.removeSync(globalVar.clientDir + 'element');
+    fs.removeSync(globalVar.clientDir + 'widget');
 });
 
 gulp.task('clean:resources', function() {
-  fs.removeSync(globalVar.publicDir);
+    fs.removeSync(globalVar.publicDir);
 });
 
 gulp.task('clean', ['clean:target', 'clean:resources']);
 
 gulp.task('bower:configure', ['clean:resources'], function(done) {
-  jsonfile.readFile('.bowerrc', function (err, obj) {
-    if (!err) {
-      fs.copySync('.bowerrc', globalVar.publicDir + '/.bowerrc');
-      /*fs.copySync('bower.json', globalVar.publicDir + '/bower.json');*/
-      if(obj.directory) {
-        globalVar.bowerDir = globalVar.publicDir + '/' + obj.directory + '/';
-      }
-    }
-    done();
-  });
+    jsonfile.readFile('.bowerrc', function(err, obj) {
+        if (!err) {
+            fs.copySync('.bowerrc', globalVar.publicDir + '/.bowerrc');
+            /*fs.copySync('bower.json', globalVar.publicDir + '/bower.json');*/
+            if (obj.directory) {
+                globalVar.bowerDir = globalVar.publicDir + '/' + obj.directory + '/';
+            }
+        }
+        done();
+    });
 });
 
 gulp.task('bower:install', ['clean', 'bower:configure'], function() {
-  if (globalVar.bowerPackages) {
-    return bower({ cmd: 'install', cwd: globalVar.publicDir, interactive: true }, [globalVar.bowerPackages]);
-  } else {
-    gutil.log('No --package provided. Using package(s) from bower_components folder.');
-    return gulp.src('./bower_components/**/*', {base: '.'}).pipe(gulp.dest(globalVar.publicDir));
-  }
+    if (globalVar.bowerPackages) {
+        return bower({
+            cmd: 'install',
+            cwd: globalVar.publicDir,
+            interactive: true
+        }, [globalVar.bowerPackages]);
+    } else {
+        gutil.log('No --package provided. Using package(s) from bower_components folder.');
+        return gulp.src('./bower_components/**/*', {
+            base: '.'
+        }).pipe(gulp.dest(globalVar.publicDir));
+    }
 });
 
+gulp.task('transpile:polymer', () => {
+    return gulp.src([
+            './bower_components/polymer/**/*.html'
+        ])
+        .pipe(sourcesHtmlSplitter.split())
+        .pipe(gulpif(/\.js$/, babel({
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "targets": {
+                            "ie": "11"
+                        }
+                    }
+                ]
+            ]
+        })))
+        .pipe(sourcesHtmlSplitter.rejoin())
+        .pipe(gulp.dest('./bower_components/ie11/polymer'))
+})
+
+gulp.task('transpile:webcomponents', () => {
+    return gulp.src([
+            './bower_components/**/*.html',
+            '!' + './bower_components/webcomponentsjs/**/*.html',
+            '!' + './bower_components/polymer/**/*.html',
+        ])
+        .pipe(sourcesHtmlSplitter.split())
+        .pipe(gulpif(/\.js$/, babel({
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "targets": {
+                            "ie": "11"
+                        }
+                    }
+                ]
+            ]
+        })))
+        .pipe(sourcesHtmlSplitter.rejoin())
+        .pipe(gulp.dest('./bower_components/ie11'))
+})
+
+gulp.task('transpile', ['transpile:polymer', 'transpile:webcomponents']);
+
 gulp.task('parse', ['analyze'], function(cb) {
-  global.parsed.forEach(function(item) {
-    if (!helpers.isBehavior(item) && item.behaviors && item.behaviors.length) {
-      item.behaviors.forEach(function(name) {
-        var nestedBehaviors = helpers.getNestedBehaviors(item, name);
-        item.properties = _.union(item.properties, nestedBehaviors.properties);
+    global.parsed.forEach(function(item) {
+        if (!helpers.isBehavior(item) && item.behaviors && item.behaviors.length) {
+            item.behaviors.forEach(function(name) {
+                var nestedBehaviors = helpers.getNestedBehaviors(item, name);
+                item.properties = _.union(item.properties, nestedBehaviors.properties);
 
-        // merge events
-        if (nestedBehaviors.events && nestedBehaviors.events.length) {
-          nestedBehaviors.events.forEach(function (event) {
-            var notDuplicate = _.filter(item.events, function (e) {
-                return e.name == event.name;
-              }).length === 0;
-            if (notDuplicate) {
-              item.events.push(event);
-            }
-          });
+                // merge events
+                if (nestedBehaviors.events && nestedBehaviors.events.length) {
+                    nestedBehaviors.events.forEach(function(event) {
+                        var notDuplicate = _.filter(item.events, function(e) {
+                            return e.name == event.name;
+                        }).length === 0;
+                        if (notDuplicate) {
+                            item.events.push(event);
+                        }
+                    });
+                }
+            });
         }
-      });
-    }
-    if (item.events) {
-      item.events.forEach(function(event) {
-        var p = [];
-        event.params.forEach(function(param) {
-          var notDuplicate = _.filter(p, function (p) {
-              return p.name == param.name;
-          }).length === 0;
-          // remove duplicated, and more than one level nested (detail.file.src)
-          if (notDuplicate && !/\..+\./.test(param.name)) {
-            p.push(param);
-          }
-        });
-        event.params = p;
-      });
-    }
+        if (item.events) {
+            item.events.forEach(function(event) {
+                var p = [];
+                event.params.forEach(function(param) {
+                    var notDuplicate = _.filter(p, function(p) {
+                        return p.name == param.name;
+                    }).length === 0;
+                    // remove duplicated, and more than one level nested (detail.file.src)
+                    if (notDuplicate && !/\..+\./.test(param.name)) {
+                        p.push(param);
+                    }
+                });
+                event.params = p;
+            });
+        }
 
-    // We don't want to wrap any private api
-    helpers.removePrivateApi(item.properties, 'name');
-  });
-  cb();
+        // We don't want to wrap any private api
+        helpers.removePrivateApi(item.properties, 'name');
+    });
+    cb();
 });
 
 gulp.task('analyze', ['clean:target', 'pre-analyze'], function() {
-  return gulp.src([globalVar.bowerDir + "*/*.html",
-    // vaadin elements
-    globalVar.bowerDir + "*/vaadin-*/vaadin-*.html",
-    // ignore all demo.html, index.html and metadata.html files
-    "!" + globalVar.bowerDir + "*/*demo.html",
-    "!" + globalVar.bowerDir + "*/*index.html",
-    "!" + globalVar.bowerDir + "*/*metadata.html",
-    // includes a set of js files only, and some do not exist
-    "!" + globalVar.bowerDir + "*/*web-animations.html",
-    // Not useful in gwt and also has spurious event names
-    "!" + globalVar.bowerDir + "*/*iron-jsonp-library.html",
-    // 
-    "!" + globalVar.bowerDir + "*/iron-doc*.html",
-    ])
-    .pipe(map(function(file, cb) {
-      hyd.Analyzer.analyze(globalVar.bowerDir + file.relative).then(function(result) {
-        var jsonArray = _.union(result.elements, result.behaviors);
-        jsonArray.forEach(function(item) {
-          var path = file.relative.replace(/\\/, '/');
-          if (item.is) {
-            item.name = item.is;
-            item.path = path;
+    return gulp.src([globalVar.bowerDir + "*/*.html",
+            // vaadin elements
+            globalVar.bowerDir + "*/vaadin-*/vaadin-*.html",
+            // ignore all demo.html, index.html and metadata.html files
+            "!" + globalVar.bowerDir + "*/*demo.html",
+            "!" + globalVar.bowerDir + "*/*index.html",
+            "!" + globalVar.bowerDir + "*/*metadata.html",
+            // includes a set of js files only, and some do not exist
+            "!" + globalVar.bowerDir + "*/*web-animations.html",
+            // Not useful in gwt and also has spurious event names
+            "!" + globalVar.bowerDir + "*/*iron-jsonp-library.html",
+            //
+            "!" + globalVar.bowerDir + "*/iron-doc*.html",
+        ])
+        .pipe(map(function(file, cb) {
+            hyd.Analyzer.analyze(globalVar.bowerDir + file.relative).then(function(result) {
+                var jsonArray = _.union(result.elements, result.behaviors);
+                jsonArray.forEach(function(item) {
+                    var path = file.relative.replace(/\\/, '/');
+                    if (item.is) {
+                        item.name = item.is;
+                        item.path = path;
 
-            var bowerFile = file.base + path.split("/")[0] + "/bower.json";
-            var bowerFileContent = fs.readFileSync(bowerFile);
-            item.bowerData = bowerFileContent ? JSON.parse(bowerFileContent) : {};
+                        var bowerFile = file.base + path.split("/")[0] + "/bower.json";
+                        var bowerFileContent = fs.readFileSync(bowerFile);
+                        item.bowerData = bowerFileContent ? JSON.parse(bowerFileContent) : {};
 
-            // Save all items in an array for later processing
-            global.parsed.push(item);
-          }
-        });
-        cb(null, file);
-      })
-      ['catch'](function(e){
-        gutil.log(e.stack);
-        cb(null, file);
-      });
-    }));
+                        // Save all items in an array for later processing
+                        global.parsed.push(item);
+                    }
+                });
+                cb(null, file);
+            })['catch'](function(e) {
+                gutil.log(e.stack);
+                cb(null, file);
+            });
+        }));
 });
 
 // Parse a template and generates a .java file.
@@ -149,98 +204,106 @@ gulp.task('analyze', ['clean:target', 'pre-analyze'], function() {
 // dir:      folder relative to the client folder to write the file
 // suffix:   extra suffix for the name
 function parseTemplate(template, obj, name, dir, suffix) {
-  var className = helpers.camelCase(name) + suffix;
-  // If there is a base .java file we extend it.
-  var classBase = helpers.camelCase(name) + suffix + "Base";
+    var className = helpers.camelCase(name) + suffix;
+    // If there is a base .java file we extend it.
+    var classBase = helpers.camelCase(name) + suffix + "Base";
 
-  // We have to compute the appropriate name-space for the component.
-  var prefix =
-    // For events we prefer the first word of the name if they are standard ones.
-    /^Event/.test(suffix) && /^(polymer|iron|paper|neon)-/.test(name) ? name :
-    // Otherwise we try the name from its bower.json, then the sub-folder name in
-    // bower_components, and finally from its name.
-    obj.bowerData && obj.bowerData.name || obj.path.replace(/.*\/+(.+)\/+[^\/]+/, '$1') || name;
-  //  Then we take the first part before first dash
-  prefix = prefix.split('-')[0].replace(/\./g,'');
+    // We have to compute the appropriate name-space for the component.
+    var prefix =
+        // For events we prefer the first word of the name if they are standard ones.
+        /^Event/.test(suffix) && /^(polymer|iron|paper|neon)-/.test(name) ? name :
+        // Otherwise we try the name from its bower.json, then the sub-folder name in
+        // bower_components, and finally from its name.
+        obj.bowerData && obj.bowerData.name || obj.path.replace(/.*\/+(.+)\/+[^\/]+/, '$1') || name;
+    //  Then we take the first part before first dash
+    prefix = prefix.split('-')[0].replace(/\./g, '');
 
-  obj.ns = globalVar.ns + '.' + prefix;
+    obj.ns = globalVar.ns + '.' + prefix;
 
-  var targetPath = globalVar.clientDir + prefix + '/' + dir;
-  var targetFile = targetPath + className + ".java";
-  fs.ensureFileSync(targetFile);
+    var targetPath = globalVar.clientDir + prefix + '/' + dir;
+    var targetFile = targetPath + className + ".java";
+    fs.ensureFileSync(targetFile);
 
-  var baseFile = libDir + globalVar.nspath + '/' + prefix + '/' + dir + classBase + ".java";
-  if (!fs.existsSync(baseFile)) {
-    var baseFile = './lib/' + globalVar.nspath + '/' + prefix + '/' + dir + classBase + ".java";
-  }
-  if (fs.existsSync(baseFile)) {
-    obj.base = classBase;
-    gutil.log("Copying: ", baseFile);
-    fs.copySync(baseFile, targetPath + classBase + ".java");
-  } else {
-    obj.base = '';
-  }
+    var baseFile = libDir + globalVar.nspath + '/' + prefix + '/' + dir + classBase + ".java";
+    if (!fs.existsSync(baseFile)) {
+        var baseFile = './lib/' + globalVar.nspath + '/' + prefix + '/' + dir + classBase + ".java";
+    }
+    if (fs.existsSync(baseFile)) {
+        obj.base = classBase;
+        gutil.log("Copying: ", baseFile);
+        fs.copySync(baseFile, targetPath + classBase + ".java");
+    } else {
+        obj.base = '';
+    }
 
-  gutil.log("Generating: ", targetFile);
-  var tpl = _.template(fs.readFileSync(tplDir + template + '.template'));
-  fs.writeFileSync(targetFile, new Buffer(tpl(_.merge({}, null, obj, helpers))));
+    gutil.log("Generating: ", targetFile);
+    var tpl = _.template(fs.readFileSync(tplDir + template + '.template'));
+    fs.writeFileSync(targetFile, new Buffer(tpl(_.merge({}, null, obj, helpers))));
 }
 
 gulp.task('generate:elements', ['parse'], function() {
-  return StreamFromArray(global.parsed,{objectMode: true})
-   .on('data', function(item) {
-     if (helpers.isBehavior(item)) {
-       parseTemplate('Behavior', item, item.is, '', '');
-     } else {
-       parseTemplate('Element', item, item.is, '', 'Element');
-     }
-   });
+    return StreamFromArray(global.parsed, {
+            objectMode: true
+        })
+        .on('data', function(item) {
+            if (helpers.isBehavior(item)) {
+                parseTemplate('Behavior', item, item.is, '', '');
+            } else {
+                parseTemplate('Element', item, item.is, '', 'Element');
+            }
+        });
 });
 
 gulp.task('generate:events', ['parse'], function() {
-  return StreamFromArray(global.parsed,{objectMode: true})
-   .on('data', function(item) {
-      if (item.events) {
-        item.events.forEach(function(event) {
-          event.bowerData = item.bowerData;
-          event.name = event.name.replace(/\s.*$/,'');
-          parseTemplate('ElementEvent', event, event.name, 'event/', 'Event');
+    return StreamFromArray(global.parsed, {
+            objectMode: true
+        })
+        .on('data', function(item) {
+            if (item.events) {
+                item.events.forEach(function(event) {
+                    event.bowerData = item.bowerData;
+                    event.name = event.name.replace(/\s.*$/, '');
+                    parseTemplate('ElementEvent', event, event.name, 'event/', 'Event');
+                });
+            }
         });
-      }
-   });
 });
 
 gulp.task('generate:widgets', ['parse'], function() {
-  return StreamFromArray(global.parsed,{objectMode: true})
-   .on('data', function(item) {
-      if (!helpers.isBehavior(item)) {
-        parseTemplate('Widget', item, item.is, 'widget/', '');
-      }
-   });
+    return StreamFromArray(global.parsed, {
+            objectMode: true
+        })
+        .on('data', function(item) {
+            if (!helpers.isBehavior(item)) {
+                parseTemplate('Widget', item, item.is, 'widget/', '');
+            }
+        });
 });
 
 gulp.task('generate:widget-events', ['parse'], function() {
-  return StreamFromArray(global.parsed,{objectMode: true})
-   .on('data', function(item) {
-      if (item.events) {
-        item.events.forEach(function(event) {
-          event.bowerData = item.bowerData;
-          event.name = event.name.replace(/\s.*$/,'');
-          parseTemplate('WidgetEvent', event, event.name, 'widget/event/', 'Event');
-          parseTemplate('WidgetEventHandler', event, event.name, 'widget/event/', 'EventHandler');
+    return StreamFromArray(global.parsed, {
+            objectMode: true
+        })
+        .on('data', function(item) {
+            if (item.events) {
+                item.events.forEach(function(event) {
+                    event.bowerData = item.bowerData;
+                    event.name = event.name.replace(/\s.*$/, '');
+                    parseTemplate('WidgetEvent', event, event.name, 'widget/event/', 'Event');
+                    parseTemplate('WidgetEventHandler', event, event.name, 'widget/event/', 'EventHandler');
+                });
+            }
         });
-      }
-   });
 });
 
-gulp.task('generate:gwt-module', function () {
-  if (globalVar.moduleName != 'Elements' || globalVar.ns != 'com.vaadin.polymer') {
-    var dest = globalVar.publicDir.replace(/[^\/]+\/?$/, '');
-    gutil.log("Generating Module: " + dest + globalVar.moduleName + ".gwt.xml");
-    return gulp.src(tplDir + "GwtModule.template")
-      .pipe(rename(globalVar.moduleName + ".gwt.xml"))
-      .pipe(gulp.dest(dest));
-  }
+gulp.task('generate:gwt-module', function() {
+    if (globalVar.moduleName != 'Elements' || globalVar.ns != 'com.vaadin.polymer') {
+        var dest = globalVar.publicDir.replace(/[^\/]+\/?$/, '');
+        gutil.log("Generating Module: " + dest + globalVar.moduleName + ".gwt.xml");
+        return gulp.src(tplDir + "GwtModule.template")
+            .pipe(rename(globalVar.moduleName + ".gwt.xml"))
+            .pipe(gulp.dest(dest));
+    }
 });
 
 gulp.task('generate:elements-all', ['generate:elements', 'generate:events']);
@@ -248,40 +311,39 @@ gulp.task('generate:elements-all', ['generate:elements', 'generate:events']);
 gulp.task('generate:widgets-all', ['generate:widgets', 'generate:widget-events']);
 
 gulp.task('generate', ['generate:elements-all', 'generate:widgets-all', 'generate:gwt-module'], function() {
-  gutil.log('Done.');
+    gutil.log('Done.');
 });
 
 gulp.task('copy:lib', function() {
-  if (!args.excludeLib) {
-    return gulp.src(libDir + '**')
-      .pipe(gulp.dest(globalVar.clientDirBase));
-  }
+    if (!args.excludeLib) {
+        return gulp.src(libDir + '**')
+            .pipe(gulp.dest(globalVar.clientDirBase));
+    }
 });
 
 gulp.task('copy:pom', function() {
-  var tpl = _.template(fs.readFileSync(tplDir + "pom.template"));
-  var pom = globalVar.currentDir + "pom.xml";
+    var tpl = _.template(fs.readFileSync(tplDir + "pom.template"));
+    var pom = globalVar.currentDir + "pom.xml";
 
-  // Try to get some configuration from a package.json
-  // otherwise use default values
-  var pkgFile = globalVar.currentDir + 'package.json';
-  globalVar.pkg = {};
-  try {
-    var pkgContent = fs.readFileSync(pkgFile);
-    globalVar.pkg = JSON.parse(pkgContent);
-  } catch(ignore) {
-  }
-  globalVar.pkg.pom = globalVar.pkg.pom || {};
-  globalVar.pkg.pom.version = args.version || globalVar.pkg.pom.version || globalVar.pkg.version;
+    // Try to get some configuration from a package.json
+    // otherwise use default values
+    var pkgFile = globalVar.currentDir + 'package.json';
+    globalVar.pkg = {};
+    try {
+        var pkgContent = fs.readFileSync(pkgFile);
+        globalVar.pkg = JSON.parse(pkgContent);
+    } catch (ignore) {}
+    globalVar.pkg.pom = globalVar.pkg.pom || {};
+    globalVar.pkg.pom.version = args.version || globalVar.pkg.pom.version || globalVar.pkg.version;
 
-  fs.ensureFileSync(pom);
-  fs.writeFileSync(pom, new Buffer(tpl(_.merge({}, null, globalVar, helpers))));
+    fs.ensureFileSync(pom);
+    fs.writeFileSync(pom, new Buffer(tpl(_.merge({}, null, globalVar, helpers))));
 });
 
-gulp.task('default', function(){
-  if(args.pom) {
-    runSequence('clean', 'bower:install', 'generate', 'copy:lib', 'copy:pom');
-  } else {
-    runSequence('clean', 'bower:install', 'generate', 'copy:lib');
-  }
+gulp.task('default', function() {
+    if (args.pom) {
+        runSequence('clean', 'bower:install', 'transpile', 'generate', 'copy:lib', 'copy:pom');
+    } else {
+        runSequence('clean', 'bower:install', 'transpile', 'generate', 'copy:lib');
+    }
 });
