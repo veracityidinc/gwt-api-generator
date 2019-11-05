@@ -70,8 +70,9 @@ gulp.task('bower:install', ['clean', 'bower:configure'], function() {
 });
 
 gulp.task('transpile:polymer', () => {
+    var publicDir = globalVar.bowerPackages ? globalVar.publicDir : './bower_components';
     return gulp.src([
-            './bower_components/polymer/**/*.html'
+            publicDir + '/polymer/**/*.html'
         ])
         .pipe(sourcesHtmlSplitter.split())
         .pipe(gulpif(/\.js$/, babel({
@@ -87,14 +88,15 @@ gulp.task('transpile:polymer', () => {
             ]
         })))
         .pipe(sourcesHtmlSplitter.rejoin())
-        .pipe(gulp.dest('./bower_components/ie11/polymer'))
+        .pipe(gulp.dest(publicDir + '/ie11/polymer'))
 })
 
 gulp.task('transpile:webcomponents', () => {
+    var publicDir = globalVar.bowerPackages ? globalVar.publicDir : './bower_components';
     return gulp.src([
-            './bower_components/**/*.html',
-            '!' + './bower_components/webcomponentsjs/**/*.html',
-            '!' + './bower_components/polymer/**/*.html',
+            publicDir + '/**/*.html',
+            '!' + publicDir + '/webcomponentsjs/**/*.html',
+            '!' + publicDir + '/polymer/**/*.html',
         ])
         .pipe(sourcesHtmlSplitter.split())
         .pipe(gulpif(/\.js$/, babel({
@@ -110,7 +112,7 @@ gulp.task('transpile:webcomponents', () => {
             ]
         })))
         .pipe(sourcesHtmlSplitter.rejoin())
-        .pipe(gulp.dest('./bower_components/ie11'))
+        .pipe(gulp.dest(publicDir + '/ie11'))
 })
 
 gulp.task('transpile', ['transpile:polymer', 'transpile:webcomponents']);
