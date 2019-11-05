@@ -344,8 +344,8 @@ gulp.task('copy:pom', function() {
 
 gulp.task('default', function() {
     if (args.pom) {
-        runSequence('clean', 'bower:install', 'transpile', 'generate', 'copy:lib', 'copy:pom');
+        runSequence('clean', 'bower:install', 'generate', 'transpile', 'copy:lib', 'copy:pom');
     } else {
-        runSequence('clean', 'bower:install', 'transpile', 'generate', 'copy:lib');
+        runSequence('clean', 'bower:install', 'generate', 'transpile', 'copy:lib');
     }
 });
