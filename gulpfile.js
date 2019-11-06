@@ -111,11 +111,7 @@ gulp.task('bower:install', ['clean', 'bower:configure'], function() {
         }, [globalVar.bowerPackages]);
     } else {
         gutil.log('No --package provided. Using package(s) from bower_components folder.');
-
-        gutil.log('Transpiling to ES5');
         runSequence('transpile')
-
-        gutil.log('Copying to src/main/resources');
         return gulp.src('./bower_components/**/*', {
             base: '.'
         }).pipe(gulp.dest(globalVar.publicDir));
