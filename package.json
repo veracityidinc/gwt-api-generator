@@ -2,7 +2,10 @@
   "name": "gwt-api-generator",
   "version": "1.11.3",
   "description": "",
-  "author": "Vaadin Ltd",
+  "authors": [
+    "Vaadin Ltd",
+    "Bogdan-George Petridean"
+  ],
   "license": "Apache License 2.0",
   "dependencies": {
     "@babel/preset-env": "^7.7.1",

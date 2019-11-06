@@ -143,6 +143,9 @@ build/Release
 # https://www.npmjs.org/doc/misc/npm-faq.html#should-i-check-my-node_modules-folder-into-git
 node_modules
 
+# npm
+package-lock.json
+
 src/**/bower_components
 src/**/polymer/client/element
 src/**/polymer/client/widget
