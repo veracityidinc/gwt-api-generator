@@ -41,6 +41,54 @@ gulp.task('clean:resources', function() {
 
 gulp.task('clean', ['clean:target', 'clean:resources']);
 
+gulp.task('transpile:polymer', () => {
+    var publicDir = globalVar.bowerPackages ? globalVar.publicDir : './bower_components';
+    return gulp.src([
+            publicDir + '/polymer/**/*.html'
+        ])
+        .pipe(sourcesHtmlSplitter.split())
+        .pipe(gulpif(/\.js$/, babel({
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "targets": {
+                            "esmodules": false
+                        }
+                    }
+                ]
+            ]
+        })))
+        .pipe(sourcesHtmlSplitter.rejoin())
+        .pipe(gulp.dest(publicDir + '/polymer'))
+})
+
+gulp.task('transpile:webcomponents', () => {
+    var publicDir = globalVar.bowerPackages ? globalVar.publicDir : './bower_components';
+    return gulp.src([
+            publicDir + '/**/*.html',
+            '!' + publicDir + '/webcomponentsjs/**/*.html',
+            '!' + publicDir + '/polymer/**/*.html',
+        ])
+        .pipe(sourcesHtmlSplitter.split())
+        .pipe(gulpif(/\.js$/, babel({
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "targets": {
+                            "esmodules": false
+                        }
+                    }
+                ]
+            ]
+        })))
+        .pipe(sourcesHtmlSplitter.rejoin())
+        .pipe(gulp.dest(publicDir))
+})
+
+gulp.task('transpile', ['transpile:polymer', 'transpile:webcomponents']);
+
 gulp.task('bower:configure', ['clean:resources'], function(done) {
     jsonfile.readFile('.bowerrc', function(err, obj) {
         if (!err) {
@@ -63,59 +111,16 @@ gulp.task('bower:install', ['clean', 'bower:configure'], function() {
         }, [globalVar.bowerPackages]);
     } else {
         gutil.log('No --package provided. Using package(s) from bower_components folder.');
+
+        gutil.log('Transpiling to ES5');
+        runSequence('transpile')
+
+        gutil.log('Copying to src/main/resources');
         return gulp.src('./bower_components/**/*', {
             base: '.'
         }).pipe(gulp.dest(globalVar.publicDir));
     }
 });
-
-gulp.task('transpile:polymer', () => {
-    var publicDir = globalVar.bowerPackages ? globalVar.publicDir : './bower_components';
-    return gulp.src([
-            publicDir + '/polymer/**/*.html'
-        ])
-        .pipe(sourcesHtmlSplitter.split())
-        .pipe(gulpif(/\.js$/, babel({
-            "presets": [
-                [
-                    "@babel/preset-env",
-                    {
-                        "targets": {
-                            "ie": "11"
-                        }
-                    }
-                ]
-            ]
-        })))
-        .pipe(sourcesHtmlSplitter.rejoin())
-        .pipe(gulp.dest(publicDir + '/ie11/polymer'))
-})
-
-gulp.task('transpile:webcomponents', () => {
-    var publicDir = globalVar.bowerPackages ? globalVar.publicDir : './bower_components';
-    return gulp.src([
-            publicDir + '/**/*.html',
-            '!' + publicDir + '/webcomponentsjs/**/*.html',
-            '!' + publicDir + '/polymer/**/*.html',
-        ])
-        .pipe(sourcesHtmlSplitter.split())
-        .pipe(gulpif(/\.js$/, babel({
-            "presets": [
-                [
-                    "@babel/preset-env",
-                    {
-                        "targets": {
-                            "ie": "11"
-                        }
-                    }
-                ]
-            ]
-        })))
-        .pipe(sourcesHtmlSplitter.rejoin())
-        .pipe(gulp.dest(publicDir + '/ie11'))
-})
-
-gulp.task('transpile', ['transpile:polymer', 'transpile:webcomponents']);
 
 gulp.task('parse', ['analyze'], function(cb) {
     global.parsed.forEach(function(item) {
@@ -344,8 +349,8 @@ gulp.task('copy:pom', function() {
 
 gulp.task('default', function() {
     if (args.pom) {
-        runSequence('clean', 'transpile', 'bower:install', 'generate', 'copy:lib', 'copy:pom');
+        runSequence('clean', 'bower:install', 'generate', 'copy:lib', 'copy:pom');
     } else {
-        runSequence('clean', 'transpile', 'bower:install', 'generate', 'copy:lib');
+        runSequence('clean', 'bower:install', 'generate', 'copy:lib');
     }
 });
