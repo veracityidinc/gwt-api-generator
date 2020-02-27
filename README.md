@@ -2,7 +2,7 @@
 
 gwt-api-generator is a tool that produces GWT Java APIs for JavaScript libraries provided as input, assuming their APIs are decorated with JSDoc annotations.
 
-Currently the generator only supports Web Components written in Polymer 1.0 syntax. Support for other type of JavaScript sources might be added in the future.
+Currently the generator only supports Web Components written using [legacy element syntax](https://polymer-library.polymer-project.org/3.0/docs/devguide/legacy-elements). Support for other type of JavaScript sources might be added in the future.
 
 Original motivation behind the project was to provide GWT community an easy access to the elements in [Vaadin Elements](https://github.com/vaadin/vaadin-core-elements) collection.
 

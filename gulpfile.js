@@ -313,7 +313,7 @@ gulp.task('generate:elements-all', ['generate:elements', 'generate:events']);
 
 gulp.task('generate:widgets-all', ['generate:widgets', 'generate:widget-events']);
 
-gulp.task('generate', ['generate:elements-all', 'generate:widgets-all', 'generate:gwt-module'], function() {
+gulp.task('generate', ['generate:elements-all',/* 'generate:widgets-all',*/ 'generate:gwt-module'], function() {
     gutil.log('Done.');
 });
 
