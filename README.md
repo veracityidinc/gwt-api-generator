@@ -133,7 +133,7 @@ Whether you need a 3 party element not included in the prebuilt packages or you 
         <!-- Generate java code for all web downloaded components -->
         <plugin>
           <artifactId>maven-antrun-plugin</artifactId>
-          <version>1.7</version>
+          <version>1.8</version>
           <executions>
             <execution>
               <phase>generate-resources</phase>
@@ -158,7 +158,7 @@ Whether you need a 3 party element not included in the prebuilt packages or you 
 
 Vaadin gwt-api-generator produces `@JsType` interfaces for JS Element level access from Java Objects.
 
-Since `JsInterop` was a feature experimental in GWT-2.7.0 and stable in GWT-2.8.0, and its implementation has absolutly changed from the experimental to the stable API, we have decided not to support old releases anymore, starting with gwt-api-generator 1.2.1.
+Since `JsInterop` was a feature experimental in GWT-2.7.0 and stable in GWT-2.8.0, and its implementation has absolutely changed from the experimental to the stable API, we have decided not to support old releases anymore, starting with gwt-api-generator 1.2.1.
 
 ## Modifying the `bower_components` folder
 
